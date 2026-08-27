@@ -1,21 +1,21 @@
 # syntax=docker/dockerfile:1.7
-# LieShouCloudPro · Admin Service (port 8082) multi-stage
-# docker build context = ../../services
+# LieShouCloud · Admin Service (port 8082) multi-stage
+# docker build context = 仓库根(含 framework submodule + services/,mvn -f pom.xml 一次聚合构建)
 
 FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /workspace
-COPY .. /workspace/
+COPY . /workspace/
 
-COPY ./.m2-settings.xml /root/.m2/settings.xml
+COPY services/.m2-settings.xml /root/.m2/settings.xml
 
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -ntp -Dmaven.test.skip=true -pl admin -am clean package
+    mvn -B -ntp -Dmaven.test.skip=true -f pom.xml -pl services/admin -am clean package
 
 FROM eclipse-temurin:21-jre-alpine AS runtime
 RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
 
-COPY --from=builder /workspace/admin/target/lieshoucloud-admin.jar /app/app.jar
+COPY --from=builder /workspace/services/admin/target/lieshoucloud-admin.jar /app/app.jar
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dfile.encoding=UTF-8"
 USER app
