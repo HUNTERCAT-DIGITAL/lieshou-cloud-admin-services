@@ -13,7 +13,6 @@
     <description>LieShouCloud open-source core services parent</description>
 
     <modules>
-        <module>common/services</module>
         <module>admin</module>
     </modules>
 

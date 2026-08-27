@@ -22,7 +22,8 @@ import io.swagger.v3.oas.annotations.servers.Server;
  *   <li>{@link OpenAPIDefinition} —— Phase 5 SpringDoc 元信息
  * </ul>
  */
-@SpringBootApplication(scanBasePackages = {"cn.huntercat.lieshoucloudpro", "cn.huntercat.lieshou.framework"})
+@SpringBootApplication(
+    scanBasePackages = {"cn.huntercat.lieshoucloudpro", "cn.huntercat.lieshou.framework"})
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "cn.huntercat.lieshoucloudpro.admin.feign")
 @OpenAPIDefinition(
