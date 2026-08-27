@@ -1,7 +1,7 @@
-# LieShouCloud-admin-services · 开源后端服务:admin
+# lieshou-cloud-admin-services · 开源后端服务:admin
 
-> 自 LieShouCloud-core/services/admin 拆分(2026-08 细粒度)。
-> 组合:services/common → LieShouCloud-common。
+> 自 lieshou-cloud-core/services/admin 拆分(2026-08 细粒度)。
+> 组合:services/common → lieshou-cloud-common。
 
 ```bash
 cd services

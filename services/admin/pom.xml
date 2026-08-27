@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>lieshoucloud-admin</artifactId>
-    <name>LieShouCloud · Admin Service</name>
+    <name>lieshou-cloud · Admin Service</name>
     <description>管理服务：通过 Feign 调用 user-service，自带 Resilience4j 熔断</description>
 
     <dependencies>
