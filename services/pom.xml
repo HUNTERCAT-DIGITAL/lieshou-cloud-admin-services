@@ -158,11 +158,13 @@
                 <artifactId>lieshoucloud-jwt-support</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <!-- lieshou-framework 业务核心（上游同源唯一） -->
+            <!-- lieshou-framework 业务核心（上游同源唯一）
+                 版本必须与该 pin 的 framework 父 pom 一致，否则 reactor 内解析不到（2026-09 从 0.1.0 → 0.3.1）。
+                 0.3.1 已在 Nexus maven-releases，故本仓发出去的 pom 外部可解析。 -->
             <dependency>
                 <groupId>cn.huntercat</groupId>
                 <artifactId>framework-common</artifactId>
-                <version>0.1.0</version>
+                <version>0.3.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

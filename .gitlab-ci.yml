@@ -23,10 +23,9 @@ verify:
     # 真门：依赖源必须是内网 Nexus（.mvn/settings.xml 若失效，Maven 会静默回落公网 repo.maven.apache.org）
     - mvn -B -ntp help:effective-settings -Doutput=/tmp/eff-settings.xml -q
     - grep -q "nexus.ts.huntercat.cn/repository/maven-public" /tmp/eff-settings.xml && echo "✅ 依赖源 = 内网 Nexus maven-public"
-    # framework 是 submodule（上游 lieshou-framework 的代码）：先 install 进本地 .m2 供解析。
-    # -Dspotless.check.skip=true 只作用于这一趟：pin 06d019d 的 framework-i18n 自身 spotless 不过
-    # （上游格式门归上游 CI 修），本仓的门在下一行 —— services 子树的 verify 真跑、不跳过。
-    - mvn -B -ntp -DskipTests -Dspotless.check.skip=true install
+    # framework 是 submodule（上游 lieshou-framework 的代码，pin = v0.3.1）：先 install 进本地 .m2 供解析。
+    # 跳过上游测试（framework 有自己的 CI 与 tag pipeline），本仓的门在下一行。
+    - mvn -B -ntp -DskipTests install
     # 本仓门 = services 子树的 spotless check + 测试
     - mvn -B -ntp -f services/pom.xml verify
   rules:
@@ -49,5 +48,5 @@ deploy:
     - export NEXUS_USER="$NEXUS_DEPLOY_USER" NEXUS_PASS="$NEXUS_DEPLOY_PASS"
     - mvn -B -ntp help:effective-settings -Doutput=/tmp/eff-settings.xml -q
     - grep -q "nexus.ts.huntercat.cn/repository/maven-public" /tmp/eff-settings.xml && echo "✅ 依赖源 = 内网 Nexus maven-public"
-    - mvn -B -ntp -DskipTests -Dspotless.check.skip=true install
+    - mvn -B -ntp -DskipTests install
     - mvn -B -ntp -f services/pom.xml deploy

@@ -40,4 +40,37 @@
     </server>
   </servers>
 
+  <!--
+    为什么还需要显式声明一个 snapshots 仓：
+    mirror 元素不能携带 releases/snapshots 策略，被镜像的 central 自带 snapshots=false，
+    ⇒ 镜像后的仓库对 SNAPSHOT 制品**根本不作为候选**（表现：直接 "Missing"，连下载都不尝试）。
+    故凡是要消费 cn.huntercat:*:*-SNAPSHOT（本仓自己发的快照 / 兄弟服务）就必须有这一块。
+    id 不能叫 nexus（否则被上面的 mirrorOf 排除在外，就绕开了 group 仓的 README 缓存）。
+  -->
+  <profiles>
+    <profile>
+      <id>nexus-snapshots</id>
+      <repositories>
+        <repository>
+          <id>nexus-snapshots</id>
+          <url>https://nexus.ts.huntercat.cn/repository/maven-public/</url>
+          <releases><enabled>false</enabled></releases>
+          <snapshots><enabled>true</enabled></snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>nexus-snapshots</id>
+          <url>https://nexus.ts.huntercat.cn/repository/maven-public/</url>
+          <releases><enabled>false</enabled></releases>
+          <snapshots><enabled>true</enabled></snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+
+  <activeProfiles>
+    <activeProfile>nexus-snapshots</activeProfile>
+  </activeProfiles>
+
 </settings>
