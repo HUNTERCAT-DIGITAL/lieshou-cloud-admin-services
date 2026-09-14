@@ -167,6 +167,21 @@
         </dependencies>
     </dependencyManagement>
 
+    <!-- 制品分发：内网 Nexus。凭证只存在于 CI 变量 NEXUS_DEPLOY_*，不落仓库。
+         注：本 pom 无 <parent>，故分发地址必须写在这里 —— 根 pom 的 distributionManagement 不会继承到本子树。 -->
+    <distributionManagement>
+        <repository>
+            <id>nexus</id>
+            <name>Nexus maven-releases</name>
+            <url>https://nexus.ts.huntercat.cn/repository/maven-releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus</id>
+            <name>Nexus maven-snapshots</name>
+            <url>https://nexus.ts.huntercat.cn/repository/maven-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+
     <build>
         <pluginManagement>
             <plugins>

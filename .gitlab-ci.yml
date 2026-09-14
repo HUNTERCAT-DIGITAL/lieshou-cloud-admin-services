@@ -1,0 +1,45 @@
+# lieshou-cloud-admin-services 质量门禁 + 制品分发（GitLab CI · 2026-09）
+# 前置：huntercat-digital 组级 docker runner（tags: java,wqc）；runner 已 map nexus.ts.huntercat.cn
+# 门 = services 子树的 mvn verify（含 spotless check）——不留"跳过格式"的假绿
+stages: [verify, deploy]
+
+variables:
+  # 内网 Caddy 自签证书不在 job 容器信任库 → 放行 submodule clone（对齐 lieshou-framework）
+  GIT_SSL_NO_VERIFY: "true"
+  # framework 是 submodule，聚合构建必需
+  GIT_SUBMODULE_STRATEGY: recursive
+
+default:
+  image: maven:3.9-eclipse-temurin-21
+  tags: [java, wqc]
+
+verify:
+  stage: verify
+  timeout: 30m
+  script:
+    - java -version
+    # framework 是 submodule（上游 lieshou-framework 的代码）：先 install 进本地 .m2 供解析。
+    # -Dspotless.check.skip=true 只作用于这一趟：pin 06d019d 的 framework-i18n 自身 spotless 不过
+    # （上游格式门归上游 CI 修），本仓的门在下一行 —— services 子树的 verify 真跑、不跳过。
+    - mvn -B -ntp -DskipTests -Dspotless.check.skip=true install
+    # 本仓门 = services 子树的 spotless check + 测试
+    - mvn -B -ntp -f services/pom.xml verify
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# 制品分发：main push → Nexus maven-snapshots（本仓版本 0.0.1-SNAPSHOT）
+# 只发 services 子树：framework 走 submodule 源码，先 install 进本地 .m2 供解析，绝不上 Nexus
+#   （framework 自己的制品由 lieshou-framework 仓的 tag pipeline 发，勿在此重复/覆盖）
+deploy:
+  stage: deploy
+  timeout: 30m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+    # 内部 CA 进 JVM 信任库（job 容器不认 Caddy 自签 CA）
+    - keytool -importcert -noprompt -trustcacerts -alias caddy-root -file /root/.m2/caddy-root.crt -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit
+    # 只带 <servers>，localRepository 仍走挂载卷 /root/.m2/repository
+    - printf '<settings><servers><server><id>nexus</id><username>%s</username><password>%s</password></server></servers></settings>' "$NEXUS_DEPLOY_USER" "$NEXUS_DEPLOY_PASS" > /tmp/ci-settings.xml
+    - mvn -B -ntp -DskipTests -Dspotless.check.skip=true install
+    - mvn -B -ntp -f services/pom.xml -s /tmp/ci-settings.xml deploy
