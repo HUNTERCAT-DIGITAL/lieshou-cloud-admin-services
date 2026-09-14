@@ -4,14 +4,21 @@
 stages: [verify, deploy]
 
 variables:
-  # 内网 Caddy 自签证书不在 job 容器信任库 → 放行 submodule clone（对齐 lieshou-framework）
+  # 内网 Caddy 自签证书不在 job 容器信任库 → 放行 git/HTTPS（对齐 lieshou-framework、gateway-services）
   GIT_SSL_NO_VERIFY: "true"
-  # framework 是 submodule，聚合构建必需
-  GIT_SUBMODULE_STRATEGY: recursive
+  # ⚠️ 不用 GitLab 的隐式递归：它在 before_script 之前执行、**不 sync URL**，而 .gitmodules 里是
+  #    ssh://git@gitlab.ts.huntercat.cn:22220/... （job 容器没有 ssh 客户端也没私钥）
+  #    → 只要子模块 commit 一变就必须真 fetch，立刻报 "cannot run ssh: No such file or directory"
+  #    （pin 不动时靠复用构建目录里的旧 checkout 蒙过去，2026-09-14 实踩）。必须自己重写成 CI_JOB_TOKEN 的 HTTPS。
+  GIT_SUBMODULE_STRATEGY: none
 
 default:
   image: maven:3.9-eclipse-temurin-21
   tags: [java, wqc]
+  before_script:
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ts.huntercat.cn/huntercat-digital/".insteadOf "ssh://git@gitlab.ts.huntercat.cn:22220/huntercat-digital/"
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
 
 verify:
   stage: verify
