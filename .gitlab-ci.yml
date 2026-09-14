@@ -15,13 +15,16 @@ default:
   image: maven:3.9-eclipse-temurin-21
   tags: [java, wqc]
   before_script:
-    # 子模块 URL 显式指向 CI_JOB_TOKEN 的 HTTPS：既不依赖 .gitmodules 里的 ssh://，也不靠 insteadOf 重写。
-    # 实测（2026-09-14）：仅靠全局 url.*.insteadOf 重写在 job 里会被 runner 注入的 git 配置撞车，
-    # 报 'fatal: transport file not allowed' + 'Fetched in submodule path framework, but it did not contain <sha>'；
-    # 同样命令在干净容器里却是成功的 → 就得把 URL 说死，不留推断空间。
-    # （不用 submodule sync：那会用 .gitmodules 的值把我们刚设的 URL 盖回去）
+    # 1) 子模块 state 必须先清干净：docker executor 复用构建目录，而早前用 recursive 策略的流水线
+    #    留下的 .git/modules/framework 在 .git 里，git clean -ffdx 清不掉，其 remote 指向旧地址。
+    #    ⇒ git 不会 clone，而是 `cd framework; GIT_DIR=.git git fetch` → 实测
+    #      'fatal: transport file not allowed' + 'Fetched in submodule path framework, but it did not
+    #      contain <sha>'（2026-09-14，pin 一变就暴露；之前只是靠旧 checkout 蒙过）。已在干净容器里复现并验证清掉即恢复。
+    - rm -rf framework .git/modules/framework
+    # 2) URL 显式说死为 CI_JOB_TOKEN 的 HTTPS：不依赖 .gitmodules 的 ssh://（job 容器无 ssh 客户端）
+    #    也不用 submodule sync —— 那会用 .gitmodules 的值把刚设的 URL 盖回去。
     - git config submodule.framework.url "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ts.huntercat.cn/huntercat-digital/lieshou-framework.git"
-    - GIT_TRACE=1 git submodule update --init --recursive --force
+    - git submodule update --init --recursive --force
 
 verify:
   stage: verify
