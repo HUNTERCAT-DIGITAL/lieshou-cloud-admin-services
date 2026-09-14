@@ -8,17 +8,20 @@ variables:
   GIT_SSL_NO_VERIFY: "true"
   # ⚠️ 不用 GitLab 的隐式递归：它在 before_script 之前执行、**不 sync URL**，而 .gitmodules 里是
   #    ssh://git@gitlab.ts.huntercat.cn:22220/... （job 容器没有 ssh 客户端也没私钥）
-  #    → 只要子模块 commit 一变就必须真 fetch，立刻报 "cannot run ssh: No such file or directory"
-  #    （pin 不动时靠复用构建目录里的旧 checkout 蒙过去，2026-09-14 实踩）。必须自己重写成 CI_JOB_TOKEN 的 HTTPS。
+  #    → 只要子模块 commit 一变就必须真 fetch，立刻炸（pin 不动时靠复用构建目录里的旧 checkout 蒙过去）。
   GIT_SUBMODULE_STRATEGY: none
 
 default:
   image: maven:3.9-eclipse-temurin-21
   tags: [java, wqc]
   before_script:
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ts.huntercat.cn/huntercat-digital/".insteadOf "ssh://git@gitlab.ts.huntercat.cn:22220/huntercat-digital/"
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
+    # 子模块 URL 显式指向 CI_JOB_TOKEN 的 HTTPS：既不依赖 .gitmodules 里的 ssh://，也不靠 insteadOf 重写。
+    # 实测（2026-09-14）：仅靠全局 url.*.insteadOf 重写在 job 里会被 runner 注入的 git 配置撞车，
+    # 报 'fatal: transport file not allowed' + 'Fetched in submodule path framework, but it did not contain <sha>'；
+    # 同样命令在干净容器里却是成功的 → 就得把 URL 说死，不留推断空间。
+    # （不用 submodule sync：那会用 .gitmodules 的值把我们刚设的 URL 盖回去）
+    - git config submodule.framework.url "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ts.huntercat.cn/huntercat-digital/lieshou-framework.git"
+    - GIT_TRACE=1 git submodule update --init --recursive --force
 
 verify:
   stage: verify
