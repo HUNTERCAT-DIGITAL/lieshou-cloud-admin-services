@@ -23,4 +23,7 @@ jobs:
           java-version: '21'
           cache: maven
       - name: Maven verify (spotless:check + tests + jacoco)
-        run: mvn -B -ntp -DskipITs -s services/.m2-settings.xml -f pom.xml verify
+        # 依赖源 = 仓内 .mvn/settings.xml（内网 Nexus），不再显式 -s。
+        # ⚠️ GitHub 托管 runner 到不了内网 Nexus（nexus.ts.huntercat.cn）——
+        #    本 workflow 只在能访问内网的 self-hosted runner 上有意义；真正生效的 CI 是 .gitlab-ci.yml。
+        run: mvn -B -ntp -DskipITs -f pom.xml verify

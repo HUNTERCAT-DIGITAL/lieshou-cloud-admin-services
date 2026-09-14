@@ -6,7 +6,12 @@ FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /workspace
 COPY . /workspace/
 
-COPY services/.m2-settings.xml /root/.m2/settings.xml
+# 依赖源由仓内 .mvn/ 固定为内网 Nexus（.mvn/maven.config 自动加载，与本地/CI 一致）。
+# 旧写法 COPY services/.m2-settings.xml → /root/.m2/settings.xml 其实从未生效：
+# 下面那行 --mount=type=cache 会把 /root/.m2 整个遮住。
+# Nexus 由 Caddy 内部 CA 签发，容器 JDK cacerts 里没有 → 先导入（.ci/caddy-root.crt 是公开根证书，非私钥）。
+RUN keytool -importcert -noprompt -trustcacerts -alias caddy-root-2026 \
+      -file .ci/caddy-root.crt -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit
 
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -ntp -Dmaven.test.skip=true -f pom.xml -pl services/admin -am clean package

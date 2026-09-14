@@ -18,6 +18,11 @@ verify:
   timeout: 30m
   script:
     - java -version
+    # Nexus 由 Caddy 内部 CA 签发，job 容器 JDK 不认 → 先导入仓内公开根证书（非私钥）
+    - keytool -importcert -noprompt -trustcacerts -alias caddy-root-2026 -file .ci/caddy-root.crt -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit
+    # 真门：依赖源必须是内网 Nexus（.mvn/settings.xml 若失效，Maven 会静默回落公网 repo.maven.apache.org）
+    - mvn -B -ntp help:effective-settings -Doutput=/tmp/eff-settings.xml -q
+    - grep -q "nexus.ts.huntercat.cn/repository/maven-public" /tmp/eff-settings.xml && echo "✅ 依赖源 = 内网 Nexus maven-public"
     # framework 是 submodule（上游 lieshou-framework 的代码）：先 install 进本地 .m2 供解析。
     # -Dspotless.check.skip=true 只作用于这一趟：pin 06d019d 的 framework-i18n 自身 spotless 不过
     # （上游格式门归上游 CI 修），本仓的门在下一行 —— services 子树的 verify 真跑、不跳过。
@@ -31,6 +36,8 @@ verify:
 # 制品分发：main push → Nexus maven-snapshots（本仓版本 0.0.1-SNAPSHOT）
 # 只发 services 子树：framework 走 submodule 源码，先 install 进本地 .m2 供解析，绝不上 Nexus
 #   （framework 自己的制品由 lieshou-framework 仓的 tag pipeline 发，勿在此重复/覆盖）
+# 凭证：.mvn/settings.xml 用 ${env.NEXUS_USER}/${env.NEXUS_PASS} 插值，这里从 CI 变量导出，不落仓库
+# 依赖解析同样走 Nexus：不需要 -s，仓内 .mvn/maven.config 已在仓库根自动加载
 deploy:
   stage: deploy
   timeout: 30m
@@ -38,8 +45,9 @@ deploy:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
     # 内部 CA 进 JVM 信任库（job 容器不认 Caddy 自签 CA）
-    - keytool -importcert -noprompt -trustcacerts -alias caddy-root -file /root/.m2/caddy-root.crt -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit
-    # 只带 <servers>，localRepository 仍走挂载卷 /root/.m2/repository
-    - printf '<settings><servers><server><id>nexus</id><username>%s</username><password>%s</password></server></servers></settings>' "$NEXUS_DEPLOY_USER" "$NEXUS_DEPLOY_PASS" > /tmp/ci-settings.xml
+    - keytool -importcert -noprompt -trustcacerts -alias caddy-root-2026 -file .ci/caddy-root.crt -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit
+    - export NEXUS_USER="$NEXUS_DEPLOY_USER" NEXUS_PASS="$NEXUS_DEPLOY_PASS"
+    - mvn -B -ntp help:effective-settings -Doutput=/tmp/eff-settings.xml -q
+    - grep -q "nexus.ts.huntercat.cn/repository/maven-public" /tmp/eff-settings.xml && echo "✅ 依赖源 = 内网 Nexus maven-public"
     - mvn -B -ntp -DskipTests -Dspotless.check.skip=true install
-    - mvn -B -ntp -f services/pom.xml -s /tmp/ci-settings.xml deploy
+    - mvn -B -ntp -f services/pom.xml deploy
