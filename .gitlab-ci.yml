@@ -2,7 +2,7 @@
 # 前置：huntercat-digital 组级 docker runner（mesh-dell · tags: java,wqc）
 # 门 = mvn -B -ntp verify（含 spotless check）——不留"跳过格式"的假绿
 # 上游：本仓无 submodule —— framework-parent / framework-* 全部从内网 Nexus 解析
-stages: [verify]
+stages: [verify, deploy]
 
 variables:
   # 依赖缓存由 runner 宿主卷提供（/srv/gitlab-runner-cache/m2 → /root/.m2）
@@ -25,3 +25,25 @@ verify:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_COMMIT_TAG'
+
+# 制品发布：仅 tag 触发，发到内网 Nexus maven-releases（凭证在项目 CI 变量 NEXUS_DEPLOY_*）
+# 坐标 cn.huntercat:lieshoucloud-admin:<version>（版本继承 framework-parent，故 tag 必须 vX.Y.Z 对齐）
+# 只发本仓模块：framework-* 由 framework 仓自己发布（同坐标重复发布会撞 Nexus 重发策略）
+# CA 注入由上面的 default.before_script 继承，这里不重复
+# 注意：下面各行的值里不要出现 ASCII 的 ": "（YAML 会把标量解析成 mapping → pipeline 无 job）
+deploy:
+  stage: deploy
+  timeout: 30m
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    # tag 必须与 pom 版本一致，否则拒发（防止 v0.4.0 下发成 0.3.3）
+    - |
+      set -e
+      ver=$(mvn -B -q -s services/.m2-settings.xml -pl services/admin help:evaluate -Dexpression=project.version -DforceStdout | tail -1)
+      [ "$CI_COMMIT_TAG" = "v$ver" ] || { echo "❌ tag $CI_COMMIT_TAG 与 pom 版本 v$ver 不一致"; exit 1; }
+      echo "发布 cn.huntercat:lieshoucloud-admin:$ver → Nexus maven-releases"
+    # servers = 发布凭证；mirror 只服务读（*,!nexus 不劫持 distributionManagement 的 nexus）
+    - printf '<settings><servers><server><id>nexus</id><username>%s</username><password>%s</password></server></servers><mirrors><mirror><id>nexus-public</id><url>https://nexus.ts.huntercat.cn/repository/maven-public/</url><mirrorOf>*,!nexus</mirrorOf></mirror></mirrors></settings>' "$NEXUS_DEPLOY_USER" "$NEXUS_DEPLOY_PASS" > /tmp/ci-settings.xml
+    # -pl 只发 admin（依赖 framework-* 从 maven-public/本地库解析）；测试已在 verify 阶段卡过
+    - mvn -B -ntp -s /tmp/ci-settings.xml -pl services/admin -DskipTests deploy
